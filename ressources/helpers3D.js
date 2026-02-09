@@ -48,6 +48,48 @@ function cylinderBetweenPoints(P1, P2, R1, R2, color){
     return [cyl, s1, s2];
 }
 
+function rectangleBetweenPoints(P1, P2, SideA, SideB, color, SideA_dir){
+
+    var arr = segmentOrient(P1, P2);
+
+    // arr[2] = half length. Full length = 2*arr[2]
+    var length = 2*arr[2];
+
+    // BoxGeometry: (X = SideA, Y = beam longitudinal axis, Z = SideB)
+    var box_geo = new THREE.BoxGeometry(SideA, length, SideB);
+
+    // Extract rotation:
+    var rotOnly = new THREE.Matrix4().extractRotation(arr[0]);
+    // Beam longitudinal axis in global coordinates
+    var beamAxis = new THREE.Vector3(0,1,0).applyMatrix4(rotOnly).normalize();
+    // SideA direction in global coordinate system
+    var SideA_global = new THREE.Vector3(1,0,0).applyMatrix4(rotOnly).normalize();
+    // Target direction (already global and perpendicular to beam)
+    var target = new THREE.Vector3(
+    -SideA_dir[1],  // x = -y OpenFAST
+     SideA_dir[2],  // y = z OpenFAST
+    -SideA_dir[0]   // z = -x OpenFAST
+    ).normalize();
+    // Compute spin angle around beam axis
+    var cross = new THREE.Vector3().crossVectors(SideA_global, target);
+    var dot = THREE.MathUtils.clamp(SideA_global.dot(target), -1, 1);
+    var spin_angle = Math.atan2(cross.dot(beamAxis), dot);
+    // Apply spin angle:
+    box_geo.rotateY(spin_angle);
+
+    var box_mat = new THREE.MeshPhongMaterial({
+        color: color,
+        shininess: 60
+    });
+
+    var box = new THREE.Mesh(box_geo, box_mat);
+
+    box.applyMatrix4(arr[0]);
+    box.position.copy(arr[1]);
+    box.updateMatrixWorld();
+
+    return box;
+}
 
 /** Create a Plane for Sea Level **/
 function createSeaLevelObject(width){
@@ -148,4 +190,4 @@ function getExtent(scene){
     return e;
 }
 
-export {segmentOrient, cylinderBetweenPoints, createSeaLevelObject, createSeaBedObject, getExtent};
+export {segmentOrient, cylinderBetweenPoints, rectangleBetweenPoints, createSeaLevelObject, createSeaBedObject, getExtent};
