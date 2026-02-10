@@ -167,23 +167,33 @@ function createWorldFromJSONStream(Jstream) {
            // NOTE: Coord conversion OpenFAST to Three:  x=-yOF, y=zOF, z=-xOF
            var P1 = new THREE.Vector3(-Nodes[i1][1], Nodes[i1][2], -Nodes[i1][0])
            var P2 = new THREE.Vector3(-Nodes[i2][1], Nodes[i2][2], -Nodes[i2][0])
-           //console.log('Adding cylinder:',P1, P2, Props[iElem].Diam)
-           var R =  Props[iElem].Diam/2;
+           // Color logic
+           var color;
            if (Props[iElem].type==1){
-               var color=0xc08f0e;
+               color=0xc08f0e;
            } else if (Props[iElem].type==2) {
-               var color=0x8ac00e; // cable
-               R=R/2;
+               color=0x8ac00e; // cable
            } else if (Props[iElem].type==3) {
-               var color=0xc00e34; //rigid
+               color=0xc00e34; //rigid
            } else {
-               var color=0xeab320; //misc
+               color=0xeab320; //misc
            }
-           var arr = PLT.cylinderBetweenPoints(P1, P2, R, R, color);
-           scene.add(arr[0]);
-           //scene.add(arr[1]);
-           //scene.add(arr[2]);
-           Elems[iElem]= arr[0]; // Store cylinder
+           var mesh; // Will hold the element to add
+           // Shape selection for beams (cylinder or rectangle)
+           if (Props[iElem].shape === "rectangle"){
+               var A = Props[iElem].SideA;
+               var B = Props[iElem].SideB;
+               var SideA_dir = Props[iElem].SideA_dir;
+               mesh = PLT.rectangleBetweenPoints(P1, P2, A, B, color, SideA_dir);
+           } else {
+               // Cylinder
+               var R =  Props[iElem].Diam/2;
+               if (Props[iElem].type==2) { R = R/2; }
+               var arr = PLT.cylinderBetweenPoints(P1, P2, R, R, color);
+               mesh = arr[0]; // Use the cylinder mesh
+           }
+           scene.add(mesh);
+           Elems[iElem]= mesh; // Store the element (cylinder or rectangle)
         }
  
 
