@@ -32,6 +32,7 @@ var params = {
     showSeaBed: false, 
     showSeaLevel: false, 
     showThreeViews: false, 
+    whiteBackground: false, // toggle white background for main canvas
 };
 var dt_min     = 0.0001;
 var dt_max     = 0.5   ;
@@ -560,7 +561,7 @@ function setupKeyboardControls() {
   };
 }
 
-/** Render the scene adter object update  */
+/** Render the scene after object update  */
 function render() {
     if (params.showThreeViews) {
         for ( var ii = 0; ii < views.length; ++ ii ) {
@@ -589,6 +590,21 @@ function render() {
         var camera = ( params.orthographicCamera ) ? orthographicCamera : perspectiveCamera;
         renderer.render(scene, camera);
     }
+}
+
+/** Toggle white background for main canvas */
+function toggleWhiteBackground(enabled) {
+    if (!renderer) return; // Exit if renderer has not been initialized
+
+    const colorValue = enabled ? 0xffffff : 0x000000; // Choose color based on toggle state (white or black)
+    const color = new THREE.Color(colorValue);
+
+    renderer.setClearColor(colorValue);
+
+    defaultView.background = color;
+    views.forEach(view => view.background = color);
+
+    if (!params.animating) plotSceneAtTime();
 }
 
 /**/
@@ -650,7 +666,8 @@ function setupGUI(){
     folder.add({reset:resetControls}, 'reset').name('Reset');
     folder.add(params, 'orthographicCamera' ).name('Parallel projection').onChange(togglePerspective);
     folder.add(params, 'showThreeViews').name('2D views').onChange(toggleThreeViews).listen();
-    folder.open();
+    folder.add(params, 'whiteBackground').name('White background').onChange(function(v){ toggleWhiteBackground(v); }).listen();
+	folder.open();
 
     menuAnim = gui.addFolder('Mode shape animation');
     menuAnim.add(params,  'dt'       , dt_min, dt_max).name( 'Freq. (w/s)').listen()
