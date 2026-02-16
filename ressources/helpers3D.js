@@ -42,6 +42,15 @@ function cylinderBetweenPoints(P1, P2, R1, R2, color){
         } 
     );
     var cyl     = new THREE.Mesh( cyl_geo, cyl_mat );
+
+    // Add edges
+    var cyl_edges = new THREE.LineSegments(
+        //Only keep edges where the angle between face normals is higher than 89 deg
+        new THREE.EdgesGeometry(cyl_geo, 89), // threshold angle = 89 deg, to filter out the longitudinal edges along the cylinders.
+        new THREE.LineBasicMaterial({ color: 0x000000 })
+    );
+    cyl.add(cyl_edges);
+
     cyl.applyMatrix4(arr[0])
     cyl.position.set(arr[1].x, arr[1].y, arr[1].z);
     cyl.updateMatrixWorld();
@@ -83,6 +92,13 @@ function rectangleBetweenPoints(P1, P2, SideA, SideB, color, SideA_dir){
     });
 
     var box = new THREE.Mesh(box_geo, box_mat);
+
+    // Add edges
+    var box_edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(box_geo),
+        new THREE.LineBasicMaterial({ color: 0x000000 })
+    );
+    box.add(box_edges);
 
     box.applyMatrix4(arr[0]);
     box.position.copy(arr[1]);

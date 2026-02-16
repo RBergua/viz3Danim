@@ -31,6 +31,7 @@ var params = {
     showAxes: true, 
     showSeaBed: false, 
     showSeaLevel: false, 
+    showEdges: true,
     showThreeViews: false, 
     whiteBackground: false, // toggle white background for main canvas
 };
@@ -46,6 +47,7 @@ var A_default  = 1     ;
 var swl, grd ; // Main WT elements
 var axes     ; // Axes
 var box     ; // Surrounding box
+var meshEdges = []; // collected edge LineSegments for elements
 var extent
 
 // --- FEM / JSON data
@@ -194,6 +196,15 @@ function createWorldFromJSONStream(Jstream) {
                mesh = arr[0]; // Use the cylinder mesh
            }
            scene.add(mesh);
+           // Collect any LineSegments added as edges to the mesh (store for show/hide)
+           if (mesh.children && mesh.children.length>0) {
+               for (var ci=0; ci<mesh.children.length; ci++) {
+                   var ch = mesh.children[ci];
+                   if (ch instanceof THREE.LineSegments) {
+                       meshEdges.push(ch);
+                   }
+               }
+           }
            Elems[iElem]= mesh; // Store the element (cylinder or rectangle)
         }
  
@@ -620,6 +631,7 @@ function enableGUI() {
     showHide(params.showAxes ,    axes);
     showHide(params.showSeaBed,   grd);
     showHide(params.showSeaLevel, swl);
+    showHide(params.showEdges, meshEdges);
     togglePerspective();
 
     // Show options, hide main menu
@@ -656,6 +668,7 @@ function setupGUI(){
     folder.add(params, 'showAxes'    ).name('Axes'     ).onChange(function(v) {showHide(v,axes)}).listen();
     folder.add(params, 'showSeaBed'  ).name('Sea bed  ').onChange(function(v) {showHide(v,grd)} ).listen();
     folder.add(params, 'showSeaLevel').name('Sea level').onChange(function(v) {showHide(v,swl)} ).listen();
+    folder.add(params, 'showEdges'   ).name('Edges'    ).onChange(function(v) {showHide(v, meshEdges)} ).listen();
     folder.open();
 
     var folder = gui.addFolder('View');
@@ -937,7 +950,13 @@ function setDtFromJS(dt_in) {
 
 //----------------------- show/hide elements -------------------------------
 function showHide(v, elem) {
-    elem.visible=v;
+    if (Array.isArray(elem)) { // Array of elements (e.g., meshEdges array)
+        for (var i=0;i<elem.length;i++) {
+            if (elem[i]) elem[i].visible = v;
+        }
+    } else if (elem) { // Single element
+        elem.visible = v;
+    }
     render();
 }
 function modeSelect(){
