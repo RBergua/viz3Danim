@@ -150,7 +150,9 @@ function createWorldFromJSONStream(Jstream) {
         }
         console.log('Mode keys: '      , Object.keys(Modes).length)
         console.log('TimeSeries keys: ', Object.keys(TimeSeries).length)
-
+        const tsKeys = Object.keys(TimeSeries).length;
+        document.getElementById('time-series').style.display = tsKeys>0 ? 'block' : 'none';
+        document.getElementById('time-series-selection').style.display = tsKeys>0 ? 'block' : 'none';
 
 
         Connectivity = AJ.Connectivity;
