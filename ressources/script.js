@@ -11,7 +11,7 @@ var perspectiveCamera, orthographicCamera;
 var defaultTarget;   // The target for the scene (where camera look at), typically center of scene
 var canvas;   // The canvas on which the renderer will draw.
 var controls; // an object of type TrackballControls, the handles rotation using the mouse.
-var gui, guiTop, MainMenu; // Menu
+var gui, guiTop, MainMenu, localCSController; // Menu
 var menuAnim; // Menu
 var frustumSize
 var windowWidth, windowHeight;
@@ -740,6 +740,30 @@ function disableGUI() {
 }
 
 
+function updateLocalCSButtonState() {
+    if (!localCSController) return;
+
+    const disabled = (params.animating || params.animID === 'Max');
+    const el = localCSController.domElement.closest('li');
+
+    // gray out
+    el.style.opacity = disabled ? '0.4' : '1.0';
+
+    // Force OFF when disabled
+    if (disabled && params.showLocalCS) {
+        params.showLocalCS = false;
+        localCSController.setValue(false);
+    }
+
+    // Dissable button
+    const input = el.querySelector('input');
+    if (input) {
+        input.disabled = disabled;
+        input.style.pointerEvents = disabled ? 'none' : '';
+    }
+    el.style.pointerEvents = disabled ? 'none' : '';
+}
+
 function setupGUI(){
 
     GUI.DEFAULT_WIDTH = 165;
@@ -761,7 +785,7 @@ function setupGUI(){
     folder.add(params, 'showSeaBed'  ).name('Sea bed  ').onChange(function(v) {showHide(v,grd)} ).listen();
     folder.add(params, 'showSeaLevel').name('Sea level').onChange(function(v) {showHide(v,swl)} ).listen();
     folder.add(params, 'showEdges'   ).name('Edges'    ).onChange(function(v) {showHide(v, meshEdges)} ).listen();
-    folder.add(params, 'showLocalCS' ).name('Local CS' ).onChange(function(v) {showHide(v && !params.animating, localCSAxes); updateLocalCSButtonState(); }).listen(); // Local CS only visible when not animating
+    localCSController = folder.add(params, 'showLocalCS').name('Local CS').onChange(function(v) { showHide(v && !params.animating && params.animID != 'Max', localCSAxes); }).listen(); // Local CS only visible when not animating
     folder.open();
 
     var folder = gui.addFolder('View');
@@ -975,8 +999,8 @@ function startAnimation() {
        jQuery("#pauseAnimation").prop('disabled', false);
        jQuery("#stopAnimation").prop('disabled', false);
        params.animating = true;
+       showHide(false, localCSAxes);
        updateLocalCSButtonState();
-       updateLocalCSVisibility();
        requestAnimationFrame(doFrame);
     }
 }
@@ -984,8 +1008,8 @@ function pauseAnimation() {
     //console.log('Pause animation')
 	if (params.animating) {
 	    params.animating = false;
+        showHide(params.showLocalCS && params.animID != 'Max', localCSAxes);
         updateLocalCSButtonState();
-        updateLocalCSVisibility();
 	}
     if (iPlot==0) {
        jQuery("#playAnimation").prop('disabled', true);
@@ -1006,9 +1030,9 @@ function stopAnimation() {
     jQuery("#pauseAnimation").prop('disabled', true);
     jQuery("#stopAnimation").prop('disabled', true);
     params.animating= false;
-    params.t_bar= 0; 
+    params.t_bar= 0;
+    showHide(params.showLocalCS && params.animID != 'Max', localCSAxes);
     updateLocalCSButtonState();
-    updateLocalCSVisibility();
     updateTime();
     plotSceneAtTime();
 }
@@ -1030,6 +1054,8 @@ function animationSwitch() {
         }
         plotSceneAtTime();
     }
+    showHide(params.showLocalCS && params.animID != 'Max', localCSAxes);
+    updateLocalCSButtonState();
 }
 function setAmplitudeFromSlider() { 
     if (!params.animating) {
@@ -1062,18 +1088,6 @@ function showHide(v, elem) {
     render();
 }
 
-function updateLocalCSButtonState() {
-    const btn = document.querySelector('input[name="showLocalCS"]');
-    if (!btn) return;
-
-    const disabled = params.animating || localCSAxes.length === 0;
-    btn.disabled = disabled;
-}
-
-function updateLocalCSVisibility() {
-    const visible = params.showLocalCS && !params.animating;
-    showHide(visible, localCSAxes);
-}
 
 function modeSelect(){
     iPlot = 1; // Plotting Modes
