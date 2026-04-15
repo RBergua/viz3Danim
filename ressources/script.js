@@ -32,6 +32,7 @@ var params = {
     showSeaBed: false, 
     showSeaLevel: false, 
     showEdges: true,
+    showLocalCS: false,  // show local coordinate systems per element
     showThreeViews: false, 
     whiteBackground: false, // toggle white background for main canvas
 };
@@ -48,6 +49,7 @@ var swl, grd ; // Main WT elements
 var axes     ; // Axes
 var box     ; // Surrounding box
 var meshEdges = []; // collected edge LineSegments for elements
+var localCSAxes = []; // per-element local coord systems
 var extent
 
 // --- FEM / JSON data
@@ -275,21 +277,106 @@ function createWorldFromJSONStream(Jstream) {
         box.position.set(extent.centerX, extent.centerY, extent.centerZ)
         //box.position.set(0,0,0);
         scene.add(box);
- 
+
         /* Add planes*/
         swl = PLT.createSeaLevelObject(extent.maxDim);
         scene.add(swl)
         grd = PLT.createSeaBedObject(extent.maxDim, groundLevel);
         scene.add(grd)
- 
+
         // --- Defining light and camera position
         createCamera();
- 
+
         // --- Axis helper
         axes = new THREE.AxesHelper( extent.maxDim/2 );
         axes.rotation.set(-Math.PI/2,0,Math.PI/2);
         scene.add( axes );
- 
+
+
+        // --- Local coordinate system axes
+        for (var iElem = 0; iElem < nElem; iElem++) {
+
+            var i1 = Connectivity[iElem][0];
+            var i2 = Connectivity[iElem][1];
+
+            var P1 = new THREE.Vector3(-Nodes[i1][1], Nodes[i1][2], -Nodes[i1][0]);
+            var P2 = new THREE.Vector3(-Nodes[i2][1], Nodes[i2][2], -Nodes[i2][0]);
+
+            var origin = new THREE.Vector3().addVectors(P1, P2).multiplyScalar(0.5); // Arrows origin (center of element)
+
+            // Determine arrow characteristic length in the longitudinal and radial directions
+            var L = P1.distanceTo(P2);
+            var arrowLen = L;
+            var arrowRad;
+            if (Props[iElem].shape === "rectangle") {
+                // Use largest side for scaling
+                var A = Props[iElem].SideA || 1;
+                var B = Props[iElem].SideB || 1;
+                arrowRad = Math.max(A, B) * 1.5;
+            } else {
+                // Cylinder
+                var D = Props[iElem].Diam || 1;
+                arrowRad = D * 1.5;
+            }
+
+            // ze: along element
+            var ze = new THREE.Vector3().subVectors(P2, P1).normalize();
+
+            var xe, ye;
+
+            // Rectangular beams:
+            if (Props[iElem].shape === "rectangle" && Props[iElem].SideA_dir) {
+
+                var SideA_dir = Props[iElem].SideA_dir;
+
+                // Convert OpenFAST → Three
+                xe = new THREE.Vector3(
+                    -SideA_dir[1],
+                    SideA_dir[2],
+                    -SideA_dir[0]
+                ).normalize();
+
+                // enforce orthogonality
+                xe.sub(ze.clone().multiplyScalar(xe.dot(ze))).normalize();
+
+                ye = new THREE.Vector3().crossVectors(ze, xe).normalize();
+            }
+            // Cylinders
+            else {
+                // Reminder:
+                // Three.js (0,1,0) = OpenFAST Z
+                // Three.js (1,0,0) = −OpenFAST Y
+                // Three.js (0,0,1) = −OpenFAST X
+
+                var globalZ_three = new THREE.Vector3(0, 1, 0);
+
+                if (Math.abs(ze.dot(globalZ_three)) > 0.999) { // ze is almost or parallel to global vertical axis
+                    // ze is vertical:
+                    // xe = OpenFAST +X
+                    // ye = OpenFAST +Y
+                    xe = new THREE.Vector3(0, 0, -1);
+                    ye = new THREE.Vector3(-1, 0, 0);
+                } else {
+                    // xe must be parallel to the global XY plane (i.e., perpendicular to global vertical axis)
+                    // and be perpendicular to ze.
+                    xe = new THREE.Vector3().crossVectors(ze, globalZ_three).normalize();
+                    // ye: right-hand rule
+                    ye = new THREE.Vector3().crossVectors(ze, xe).normalize();
+                }
+            }
+
+            // Build arrows
+            var group = new THREE.Group();
+            group.add(new THREE.ArrowHelper(xe, origin, arrowRad, 0xff0000, arrowRad*0.3, arrowRad*0.15)); // xe in red
+            group.add(new THREE.ArrowHelper(ye, origin, arrowRad, 0x00ff00, arrowRad*0.3, arrowRad*0.15)); // ye in green
+            group.add(new THREE.ArrowHelper(ze, origin, arrowLen, 0x0000ff, arrowRad*0.3, arrowRad*0.15)); // ze in blue
+
+            group.visible = params.showLocalCS;
+
+            scene.add(group);
+            localCSAxes.push(group);
+        }
+
 
         // --- Possibly start animating
         if (Object.keys(Modes).length > 0) {
@@ -634,6 +721,7 @@ function enableGUI() {
     showHide(params.showSeaBed,   grd);
     showHide(params.showSeaLevel, swl);
     showHide(params.showEdges, meshEdges);
+    showHide(params.showLocalCS, localCSAxes);
     togglePerspective();
 
     // Show options, hide main menu
@@ -671,6 +759,7 @@ function setupGUI(){
     folder.add(params, 'showSeaBed'  ).name('Sea bed  ').onChange(function(v) {showHide(v,grd)} ).listen();
     folder.add(params, 'showSeaLevel').name('Sea level').onChange(function(v) {showHide(v,swl)} ).listen();
     folder.add(params, 'showEdges'   ).name('Edges'    ).onChange(function(v) {showHide(v, meshEdges)} ).listen();
+    folder.add(params, 'showLocalCS' ).name('Local CS' ).onChange(function(v) {showHide(v, localCSAxes)}).listen();
     folder.open();
 
     var folder = gui.addFolder('View');
