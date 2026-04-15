@@ -1,22 +1,45 @@
 import * as THREE from            './three.module.js';
 
 /* returns orientation and position of a segment, assumed to be along y*/
-function segmentOrient(P1, P2){
+function segmentOrient(P1, P2, SideA_dir){ /* Optional sideA_dir argument for the rectangle cross section */
     var direction = new THREE.Vector3().subVectors( P2, P1 );
     var middle   =  new THREE.Vector3().addVectors( P1, direction.multiplyScalar(0.5) );
-    var orientation = new THREE.Matrix4();
+    var length = direction.length(); // half-length. Callers use 2*arr[2] for full beam length
+
+    var orientation = new THREE.Matrix4()
+
     /* THREE.Object3D().up (=Y) default orientation for all objects */
-    orientation.lookAt(P1, P2, new THREE.Object3D().up);
-    /* rotation around axis X by -90 degrees 
-     * matches the default orientation Y 
-     * with the orientation of looking Z */
-    var M1=new THREE.Matrix4();
-    M1.set(1,0,0,0,
-           0,0,1,0, 
-           0,-1,0,0,
-           0,0,0,1);
-    orientation.multiply(M1);
-    return [orientation, middle, direction.length()];
+    if (SideA_dir) {
+        // Rectangle: build basis from beam longitudinal axis + known SideA_dir
+        
+        // Beam longitudinal axis
+        var yAxis = direction.clone().normalize();
+        /* Coord conversion OpenFAST->Three.js */
+        var xAxis = new THREE.Vector3(
+            -SideA_dir[1],  // x = -y OpenFAST
+             SideA_dir[2],  // y = z OpenFAST
+            -SideA_dir[0]   // z = -x OpenFAST
+        ).normalize();
+        var zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis).normalize();
+
+        xAxis.crossVectors(yAxis, zAxis).normalize(); // Re-orthogonalize xAxis: ensures SideA is perpendicular to the deformed beam axis
+        orientation.makeBasis(xAxis, yAxis, zAxis);
+
+    } else {
+        // Cylinder
+        orientation.lookAt(P1, P2, new THREE.Object3D().up);
+        /* rotation around axis X by -90 degrees
+        * matches the default orientation Y
+        * with the orientation of looking Z */
+        var M1=new THREE.Matrix4();
+        M1.set(1,0,0,0,
+               0,0,1,0,
+               0,-1,0,0,
+               0,0,0,1);
+        orientation.multiply(M1);
+    }
+
+    return [orientation, middle, length];
 }
 
 function cylinderBetweenPoints(P1, P2, R1, R2, color){
@@ -59,32 +82,13 @@ function cylinderBetweenPoints(P1, P2, R1, R2, color){
 
 function rectangleBetweenPoints(P1, P2, SideA, SideB, color, SideA_dir){
 
-    var arr = segmentOrient(P1, P2);
+    var arr = segmentOrient(P1, P2, SideA_dir);
 
     // arr[2] = half length. Full length = 2*arr[2]
     var length = 2*arr[2];
 
     // BoxGeometry: (X = SideA, Y = beam longitudinal axis, Z = SideB)
     var box_geo = new THREE.BoxGeometry(SideA, length, SideB);
-
-    // Extract rotation:
-    var rotOnly = new THREE.Matrix4().extractRotation(arr[0]);
-    // Beam longitudinal axis in global coordinates
-    var beamAxis = new THREE.Vector3(0,1,0).applyMatrix4(rotOnly).normalize();
-    // SideA direction in global coordinate system
-    var SideA_global = new THREE.Vector3(1,0,0).applyMatrix4(rotOnly).normalize();
-    // Target direction (already global and perpendicular to beam)
-    var target = new THREE.Vector3(
-    -SideA_dir[1],  // x = -y OpenFAST
-     SideA_dir[2],  // y = z OpenFAST
-    -SideA_dir[0]   // z = -x OpenFAST
-    ).normalize();
-    // Compute spin angle around beam axis
-    var cross = new THREE.Vector3().crossVectors(SideA_global, target);
-    var dot = THREE.MathUtils.clamp(SideA_global.dot(target), -1, 1);
-    var spin_angle = Math.atan2(cross.dot(beamAxis), dot);
-    // Apply spin angle:
-    box_geo.rotateY(spin_angle);
 
     var box_mat = new THREE.MeshPhongMaterial({
         color: color,
@@ -94,13 +98,12 @@ function rectangleBetweenPoints(P1, P2, SideA, SideB, color, SideA_dir){
     var box = new THREE.Mesh(box_geo, box_mat);
 
     // Add edges
-    var box_edges = new THREE.LineSegments(
+    box.add(new THREE.LineSegments(
         new THREE.EdgesGeometry(box_geo),
         new THREE.LineBasicMaterial({ color: 0x000000 })
-    );
-    box.add(box_edges);
+    ));
 
-    box.applyMatrix4(arr[0]);
+    box.setRotationFromMatrix(arr[0]);
     box.position.copy(arr[1]);
     box.updateMatrixWorld();
 
