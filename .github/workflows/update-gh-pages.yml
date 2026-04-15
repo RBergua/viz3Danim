@@ -1,0 +1,48 @@
+name: Update github.io submodule
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    types: [closed]
+
+jobs:
+  update-submodule:
+    if: github.event_name == 'push' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout viz3Danim
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GH_IO_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Update submodule in github.io repo
+        run: |
+          git clone git@github.com:ebranlard/ebranlard.github.io.git site
+          
+          cd site
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # Update submodule pointer to latest commit of viz3Danim
+          git submodule update --init --recursive
+
+          cd viz3Danim
+          git checkout main
+          git pull origin main
+          cd ..
+
+          git add viz3Danim
+          git commit -m "Update viz3Danim submodule" || echo "No changes"
+          git push
