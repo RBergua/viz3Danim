@@ -730,6 +730,8 @@ function enableGUI() {
 
     // --- Animate
     startAnimation();
+
+    updateLocalCSButtonState();
 }
 
 /**/
@@ -759,7 +761,7 @@ function setupGUI(){
     folder.add(params, 'showSeaBed'  ).name('Sea bed  ').onChange(function(v) {showHide(v,grd)} ).listen();
     folder.add(params, 'showSeaLevel').name('Sea level').onChange(function(v) {showHide(v,swl)} ).listen();
     folder.add(params, 'showEdges'   ).name('Edges'    ).onChange(function(v) {showHide(v, meshEdges)} ).listen();
-    folder.add(params, 'showLocalCS' ).name('Local CS' ).onChange(function(v) {showHide(v, localCSAxes)}).listen();
+    folder.add(params, 'showLocalCS' ).name('Local CS' ).onChange(function(v) {showHide(v && !params.animating, localCSAxes); updateLocalCSButtonState(); }).listen(); // Local CS only visible when not animating
     folder.open();
 
     var folder = gui.addFolder('View');
@@ -973,6 +975,8 @@ function startAnimation() {
        jQuery("#pauseAnimation").prop('disabled', false);
        jQuery("#stopAnimation").prop('disabled', false);
        params.animating = true;
+       updateLocalCSButtonState();
+       updateLocalCSVisibility();
        requestAnimationFrame(doFrame);
     }
 }
@@ -980,6 +984,8 @@ function pauseAnimation() {
     //console.log('Pause animation')
 	if (params.animating) {
 	    params.animating = false;
+        updateLocalCSButtonState();
+        updateLocalCSVisibility();
 	}
     if (iPlot==0) {
        jQuery("#playAnimation").prop('disabled', true);
@@ -1001,6 +1007,8 @@ function stopAnimation() {
     jQuery("#stopAnimation").prop('disabled', true);
     params.animating= false;
     params.t_bar= 0; 
+    updateLocalCSButtonState();
+    updateLocalCSVisibility();
     updateTime();
     plotSceneAtTime();
 }
@@ -1053,6 +1061,20 @@ function showHide(v, elem) {
     }
     render();
 }
+
+function updateLocalCSButtonState() {
+    const btn = document.querySelector('input[name="showLocalCS"]');
+    if (!btn) return;
+
+    const disabled = params.animating || localCSAxes.length === 0;
+    btn.disabled = disabled;
+}
+
+function updateLocalCSVisibility() {
+    const visible = params.showLocalCS && !params.animating;
+    showHide(visible, localCSAxes);
+}
+
 function modeSelect(){
     iPlot = 1; // Plotting Modes
     const key_id = document.querySelector('input[name="mode"]:checked').id.split('_')
