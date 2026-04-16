@@ -304,7 +304,7 @@ function createWorldFromJSONStream(Jstream) {
 
             var origin = new THREE.Vector3().addVectors(P1, P2).multiplyScalar(0.5); // Arrows origin (center of element)
 
-            // Determine arrow characteristic length in the longitudinal and radial directions
+            // Determine arrow characteristic length in the longitudinal (arrowLen) and radial directions (arrowRad)
             var L = P1.distanceTo(P2);
             var arrowLen = L;
             var arrowRad;
@@ -324,46 +324,42 @@ function createWorldFromJSONStream(Jstream) {
 
             var xe, ye;
 
-            // Rectangular beams:
-            if (Props[iElem].shape === "rectangle" && Props[iElem].SideA_dir) {
+            // Unified local x-direction (from either format: rectangular o circular beams):
+            var x_e_dir = Props[iElem].SideA_dir || Props[iElem].x_e;
 
-                var SideA_dir = Props[iElem].SideA_dir;
-
-                // Convert OpenFAST → Three
+            if (x_e_dir) {
+                // Convert OpenFAST → Three.js:  x=-yOF, y=zOF, z=-xOF
                 xe = new THREE.Vector3(
-                    -SideA_dir[1],
-                    SideA_dir[2],
-                    -SideA_dir[0]
+                    -x_e_dir[1],
+                    x_e_dir[2],
+                    -x_e_dir[0]
                 ).normalize();
 
-                // enforce orthogonality
+                // Enforce orthogonality to ze
                 xe.sub(ze.clone().multiplyScalar(xe.dot(ze))).normalize();
 
-                ye = new THREE.Vector3().crossVectors(ze, xe).normalize();
-            }
-            // Cylinders
-            else {
+            } else {
+                // Fallback (no direction available, e.g., from older JSON files for circular beams)
                 // Reminder:
-                // Three.js (0,1,0) = OpenFAST Z
-                // Three.js (1,0,0) = −OpenFAST Y
-                // Three.js (0,0,1) = −OpenFAST X
+                // Three.js (0,1,0) = OpenFAST Z (vertical upwards)
+                // Three.js (0,0,-1) = OpenFAST X
+                // Three.js (-1,0,0) = OpenFAST Y
+                const globalZ_three = new THREE.Vector3(0, 1, 0);
 
-                var globalZ_three = new THREE.Vector3(0, 1, 0);
-
-                if (Math.abs(ze.dot(globalZ_three)) > 0.999) { // ze is almost or parallel to global vertical axis
-                    // ze is vertical:
-                    // xe = OpenFAST +X
-                    // ye = OpenFAST +Y
-                    xe = new THREE.Vector3(0, 0, -1);
-                    ye = new THREE.Vector3(-1, 0, 0);
+                if (Math.abs(ze.dot(globalZ_three)) > 0.999) {
+                    // ze vertical: singular case, cross product ze x globalZ degenerates to zero. 
+                    xe = new THREE.Vector3(0, 0, -1); // x_e is aligned with OpenFAST X global axis
                 } else {
+                    // All other beaams that are not vertical
                     // xe must be parallel to the global XY plane (i.e., perpendicular to global vertical axis)
-                    // and be perpendicular to ze.
+                    // and perpendicular to ze. Cross product.
+                    // Also, the rotation from ze toward global Z about xe is positive and <= than 180 degrees
                     xe = new THREE.Vector3().crossVectors(ze, globalZ_three).normalize();
-                    // ye: right-hand rule
-                    ye = new THREE.Vector3().crossVectors(ze, xe).normalize();
                 }
             }
+
+            // ye: right-hand rule
+            ye = new THREE.Vector3().crossVectors(ze, xe).normalize();
 
             // Build arrows
             var group = new THREE.Group();
