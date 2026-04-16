@@ -781,7 +781,20 @@ function setupGUI(){
     folder.add(params, 'showSeaBed'  ).name('Sea bed  ').onChange(function(v) {showHide(v,grd)} ).listen();
     folder.add(params, 'showSeaLevel').name('Sea level').onChange(function(v) {showHide(v,swl)} ).listen();
     folder.add(params, 'showEdges'   ).name('Edges'    ).onChange(function(v) {showHide(v, meshEdges)} ).listen();
-    localCSController = folder.add(params, 'showLocalCS').name('Local CS').onChange(function(v) { showHide(v && !params.animating && params.animID != 'Max', localCSAxes); }).listen(); // Local CS only visible when not animating
+    localCSController = folder.add(params, 'showLocalCS').name('Local CS')
+        .onChange(function(v) {
+            showHide(v && !params.animating && params.animID != 'Max', localCSAxes);
+            // Show/hide a small legend explaining the arrow colours
+            var leg = document.getElementById('localCS-legend');
+            if (!leg) {
+                leg = document.createElement('div');
+                leg.id = 'localCS-legend';
+                leg.style.cssText = 'position:fixed; bottom:8px; left:8px; background:rgba(0,0,0,0.8); color:#fff; padding:6px 12px; border-radius:4px; font-size:15px; pointer-events:none; line-height:2;';
+                leg.innerHTML = '<div style="margin-bottom:2px;">Local coordinate system:</div><span style="color:#ff4444; font-size:18px;">&#9679; x<sub>e</sub></span> &nbsp;&nbsp; <span style="color:#44ff44; font-size:18px;">&#9679; y<sub>e</sub></span> &nbsp;&nbsp; <span style="color:#4488ff; font-size:18px;">&#9679; z<sub>e</sub></span>';
+                document.body.appendChild(leg);
+            }
+            leg.style.display = v ? 'block' : 'none';
+        }).listen(); // Local CS only visible when not Displacement: None
     folder.open();
 
     var folder = gui.addFolder('View');
